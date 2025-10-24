@@ -58,15 +58,8 @@ void OpenGLRenderer::Render() {
     glClearColor(colorR, colorG, colorB, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // Ejemplo de renderizado simple
-    glBegin(GL_TRIANGLES);
-        glColor3f(1.0f, 0.0f, 0.0f);
-        glVertex2f(-0.5f, -0.5f);
-        glColor3f(0.0f, 1.0f, 0.0f);
-        glVertex2f(0.5f, -0.5f);
-        glColor3f(0.0f, 0.0f, 1.0f);
-        glVertex2f(0.0f, 0.5f);
-    glEnd();
+    // Solo dibujar fondo, sin figura inicial
+    // La figura se dibujará desde las ventanas específicas
 }
 
 void OpenGLRenderer::SwapBuffers() {

@@ -1,63 +1,47 @@
 // main.cpp
+#include "MainWindow.h"
 #include "WindowBuilder.h"
 #include <iostream>
 
 int main()
 {
-    // Crear el builder
-    WindowBuilder builder;
-
-    // Crear primera ventana
-    auto window1 = builder.Build(L"Ventana 1 - OpenGL", 800, 600);
-    if (window1)
+    // Crear ventana principal
+    WindowConfig mainConfig(L"Transformaciones Geométricas - Principal", 500, 300, 100, 100);
+    auto mainWindow = std::make_unique<MainWindow>(mainConfig);
+    
+    if (!mainWindow->Create())
     {
-        window1->SetRenderColor(0.2f, 0.3f, 0.4f);
-        window1->Show();
+        std::wcout << L"Error: No se pudo crear la ventana principal" << std::endl;
+        return -1;
     }
-
-    // Crear segunda ventana con configuración personalizada
-    WindowConfig config2(L"Ventana 2 - OpenGL", 640, 480, 100, 100);
-    auto window2 = builder.Build(config2);
-    if (window2)
+    
+    mainWindow->SetRenderColor(0.1f, 0.1f, 0.2f);
+    mainWindow->Show();
+    
+    std::wcout << L"Aplicación iniciada. Usa el botón para abrir la ventana de dibujo." << std::endl;
+    
+    // Loop de mensajes simple
+    MSG msg = {};
+    while (true)
     {
-        window2->SetRenderColor(0.4f, 0.2f, 0.3f);
-        window2->Show();
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            if (msg.message == WM_QUIT)
+                break;
+            
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else
+        {
+            // Verificar si la ventana principal sigue activa
+            if (!mainWindow->IsActive())
+                break;
+            
+            Sleep(1);
+        }
     }
-
-    // Crear tercera ventana
-    auto window3 = builder.Build(L"Ventana 3 - OpenGL", 500, 400);
-    if (window3)
-    {
-        window3->SetRenderColor(0.3f, 0.4f, 0.2f);
-        window3->Show();
-    }
-
-    // Obtener el comunicador para enviar mensajes entre ventanas
-    auto communicator = builder.GetCommunicator();
-
-    std::wcout << L"Ventanas creadas: " << builder.GetWindows().size() << std::endl;
-    std::wcout << L"Presiona cualquier tecla para cambiar los titulos..." << std::endl;
-
-    // Simular comunicación después de un tiempo
-    Sleep(2000);
-
-    // Ejemplo de broadcast: todas las ventanas recibirán este mensaje
-    communicator->BroadcastMessage(L"Test Message");
-
-    if (window1 && window1->IsActive())
-    {
-        window1->SetTitle(L"Ventana 1 - Actualizada");
-    }
-
-    // Enviar mensaje broadcast
-    communicator->BroadcastMessage(L"System Ready");
-
-    std::wcout << L"Loop de mensajes iniciado. Cierra todas las ventanas para salir." << std::endl;
-
-    // Iniciar el loop de mensajes
-    builder.MessageLoop();
-
-    std::wcout << L"Aplicacion finalizada." << std::endl;
-
+    
+    std::wcout << L"Aplicación finalizada." << std::endl;
     return 0;
 }

@@ -1,5 +1,6 @@
 // WindowBuilder.cpp
 #include "WindowBuilder.h"
+#include <iostream>
 
 WindowBuilder::WindowBuilder()
 {
@@ -8,7 +9,15 @@ WindowBuilder::WindowBuilder()
 
 std::shared_ptr<Window> WindowBuilder::Build(const std::wstring &title, int width, int height)
 {
-    WindowConfig config(title.c_str(), width, height);
+    // Debug: verificar que el título se pase correctamente
+    std::wcout << L"Building window with title: '" << title << L"'" << std::endl;
+    
+    // Usar el constructor que toma std::wstring directamente
+    WindowConfig config(title, width, height);
+    
+    // Debug: verificar que se guarde correctamente
+    std::wcout << L"Config title stored: '" << config.title << L"'" << std::endl;
+    
     return Build(config);
 }
 
@@ -23,16 +32,9 @@ std::shared_ptr<Window> WindowBuilder::Build(const WindowConfig &config)
         // Registrar listener para comunicación entre ventanas
         communicator->RegisterListener([window](const std::wstring &msg) {
             if (window->IsActive() && window->GetHandle()) {
-                // Preservar el título original y agregar el mensaje
-                std::wstring originalTitle = window->GetConfig().title;
-                std::wstring newTitle = originalTitle + L" - " + msg;
-                
-                // Debug: verificar que el título original se preserve
-                if (originalTitle.empty()) {
-                    newTitle = L"Window - " + msg;
-                }
-                
-                window->SetTitle(newTitle.c_str());
+                // Simplificar: solo agregar el mensaje al final
+                std::wstring currentTitle = L"Window - " + msg;
+                window->SetTitle(currentTitle.c_str());
             }
         });
 

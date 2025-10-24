@@ -1,5 +1,6 @@
 // Window.cpp
 #include "Window.h"
+#include <iostream>
 
 const wchar_t *WINDOW_CLASS_NAME = L"OpenGLWindowClass";
 
@@ -21,23 +22,30 @@ bool Window::Create()
 {
     HINSTANCE hInstance = GetModuleHandle(nullptr);
 
-    // Registrar clase de ventana
+    // Crear un nombre de clase único para cada ventana
+    static int windowCounter = 0;
+    windowCounter++;
+    std::wstring uniqueClassName = L"OpenGLWindowClass" + std::to_wstring(windowCounter);
+    
+    // Registrar clase de ventana única
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wc.lpfnWndProc = StaticWndProc;
     wc.hInstance = hInstance;
     wc.hCursor = LoadCursorW(nullptr, (LPCWSTR)IDC_ARROW);
-    wc.lpszClassName = WINDOW_CLASS_NAME;
+    wc.lpszClassName = uniqueClassName.c_str();
 
     RegisterClassExW(&wc);
 
-    // Crear ventana
-    hwnd = CreateWindowExW(
-        0,
-        WINDOW_CLASS_NAME,
+    // Debug: verificar el título antes de crear la ventana
+    std::wcout << L"Creating window with title: '" << config.title << L"'" << std::endl;
+    
+    // Crear ventana usando CreateWindowW (más simple)
+    hwnd = CreateWindowW(
+        uniqueClassName.c_str(),
         config.title.c_str(),
-        WS_OVERLAPPEDWINDOW,
+        WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
         config.posX, config.posY,
         config.width, config.height,
         nullptr, nullptr, hInstance, this);

@@ -8,7 +8,7 @@
 
 class Window : public IWindow, public IMessageHandler
 {
-private:
+protected:
     HWND hwnd;
     WindowConfig config;
     std::unique_ptr<OpenGLRenderer> renderer;
@@ -20,7 +20,7 @@ public:
     Window(const WindowConfig &cfg);
     virtual ~Window();
 
-    bool Create();
+    virtual bool Create();
 
     // IWindow interface
     void Show() override;
@@ -34,4 +34,8 @@ public:
 
     void SetRenderColor(float r, float g, float b);
     const WindowConfig& GetConfig() const;
+    
+protected:
+    HWND GetWindowHandle() const { return hwnd; }
+    OpenGLRenderer* GetRenderer() const { return renderer.get(); }
 };
