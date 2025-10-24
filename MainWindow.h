@@ -6,6 +6,7 @@
 #include "DrawingWindow.h"
 #include "Figure.h"
 #include "FigureCallback.h"
+#include "Color.h"
 #include <memory>
 #include <vector>
 

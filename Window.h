@@ -34,8 +34,8 @@ public:
 
     void SetRenderColor(float r, float g, float b);
     const WindowConfig& GetConfig() const;
-    
-protected:
+
+    // Public methods for window handle access
     HWND GetWindowHandle() const { return hwnd; }
     OpenGLRenderer* GetRenderer() const { return renderer.get(); }
 };

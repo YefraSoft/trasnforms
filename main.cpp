@@ -6,7 +6,7 @@
 int main()
 {
     // Crear ventana principal
-    WindowConfig mainConfig(L"Transformaciones Geométricas - Principal", 500, 300, 100, 100);
+    WindowConfig mainConfig(L"Transformaciones Geométricas - Principal", 1000, 700, 100, 100);
     auto mainWindow = std::make_unique<MainWindow>(mainConfig);
     
     if (!mainWindow->Create())

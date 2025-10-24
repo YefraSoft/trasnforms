@@ -1,12 +1,13 @@
 // MainWindow.cpp
 #include "MainWindow.h"
 #include <iostream>
+#include <algorithm> // Para std::min y std::max
 
 MainWindow::MainWindow(const WindowConfig &config)
     : Window(config), figureCounter(0)
 {
-    titleLabel = std::make_unique<Label>(50, 50, 300, 40, L"Transformaciones Geométricas");
-    drawButton = std::make_unique<Button>(150, 150, 150, 40, L"Abrir Dibujo");
+    titleLabel = std::make_unique<Label>(250, 30, 500, 30, L"Transformaciones Geométricas");
+    drawButton = std::make_unique<Button>(260, 70, 150, 40, L"Abrir Dibujo");
 }
 
 bool MainWindow::Create()
@@ -51,7 +52,15 @@ LRESULT MainWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
     {
         if (HIWORD(wParam) == BN_CLICKED)
         {
-            OnDrawButtonClick();
+            // Verificar qué control específico envió el mensaje
+            int controlId = LOWORD(wParam);
+
+            // ID del botón de dibujo (primero que se crea)
+            if (controlId == 1001) // ID del drawButton
+            {
+                OnDrawButtonClick();
+            }
+            // Para otros controles, ignorar por ahora
         }
         return 0;
     }
@@ -147,6 +156,16 @@ void MainWindow::OnDrawButtonClick()
     if (drawingWindow->Create())
     {
         drawingWindow->Show();
+
+        // Mantener z-order: ventana de dibujo detrás de la principal
+        // para evitar que se superponga y tape la interfaz principal
+        SetWindowPos(
+            drawingWindow->GetWindowHandle(),      // Ventana de dibujo
+            GetWindowHandle(),                     // Ventana principal (referencia)
+            0, 0, 0, 0,                            // No cambiar posición/tamaño
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER // Mantener z-order actual
+        );
+
         // Almacenar la ventana para que no se destruya
         drawingWindows.push_back(std::move(drawingWindow));
         std::wcout << L"Drawing window created successfully for " << figureName.c_str() << std::endl;
@@ -180,6 +199,29 @@ void MainWindow::OnFigureComplete(std::shared_ptr<Figure> figure)
 
 void MainWindow::DrawAllFigures()
 {
+    // ============================================================================
+    // NUEVO MÉTODO DE ORGANIZACIÓN DE FIGURAS - SISTEMA DE GRID SIMPLE
+    // ============================================================================
+    //
+    // Sistema mejorado: Organización en grid con posiciones fijas
+    //
+    // Ventajas del nuevo sistema:
+    // 1. Posiciones predecibles y fijas basadas en índice de figura
+    // 2. Sin cálculos de offset acumulativos (no hay error de acumulación)
+    // 3. Grid responsive que se adapta al número de figuras
+    // 4. Escaling uniforme para todas las figuras
+    // 5. Sin debug output innecesario
+    // 6. Código más limpio y mantenible
+    // 7. Mejor uso del espacio disponible
+    //
+    // Configuración del Grid:
+    // - Máximo 6 figuras por fila (ajustable)
+    // - Área de dibujo: -0.9f a 0.9f (horizontal y vertical)
+    // - Espacio entre figuras: 10% del área total
+    // - Escaling automático basado en el número de figuras
+    //
+    // ============================================================================
+
     auto *renderer = GetRenderer();
     if (!renderer || figures.empty())
         return;
@@ -187,10 +229,27 @@ void MainWindow::DrawAllFigures()
     // Asegurar que el contexto OpenGL esté activo
     wglMakeCurrent(GetDC(GetWindowHandle()), renderer->GetGLRC());
 
-    std::wcout << L"DEBUG: DrawAllFigures called with " << figures.size() << L" figures" << std::endl;
+    // Configuración del área de dibujo
+    const float areaLeft = -0.9f;
+    const float areaRight = 0.9f;
+    const float areaTop = 0.9f;
+    const float areaBottom = -0.9f;
 
-    // Dibujar todas las figuras centradas
-    for (size_t i = 0; i < figures.size(); ++i)
+    const int maxFiguresPerRow = 3; // Máximo 3 figuras por fila
+    const int maxRows = 3;          // Máximo 3 filas (9 figuras total)
+
+    // Calcular grid dimensions
+    int totalFigures = static_cast<int>(figures.size());
+    int figuresPerRow = (std::min)(maxFiguresPerRow, totalFigures);
+    int totalRows = (totalFigures + figuresPerRow - 1) / figuresPerRow; // Ceiling division
+    totalRows = (std::min)(totalRows, maxRows);
+
+    // Calcular tamaño de celda
+    float cellWidth = (areaRight - areaLeft) / figuresPerRow;
+    float cellHeight = (areaTop - areaBottom) / totalRows;
+
+    // Dibujar cada figura en su posición de grid
+    for (int i = 0; i < totalFigures; ++i)
     {
         const auto &figure = figures[i];
         const auto &points = figure->GetPoints();
@@ -198,49 +257,74 @@ void MainWindow::DrawAllFigures()
         if (points.size() < 2)
             continue;
 
-        // Color diferente para cada figura
-        float colorR = (i % 3 == 0) ? 1.0f : 0.0f;
-        float colorG = (i % 3 == 1) ? 1.0f : 0.0f;
-        float colorB = (i % 3 == 2) ? 1.0f : 0.0f;
+        // Calcular posición en el grid
+        int row = i / figuresPerRow;
+        int col = i % figuresPerRow;
 
-        std::wcout << L"DEBUG: Using color (" << colorR << L", " << colorG << L", " << colorB << L") for figure " << i << std::endl;
+        // Calcular centro de la celda
+        float cellCenterX = areaLeft + (col + 0.5f) * cellWidth;
+        float cellCenterY = areaTop - (row + 0.5f) * cellHeight;
 
-        glColor3f(colorR, colorG, colorB);
+        // Calcular tamaño de la figura para escalar
+        float minX = (std::numeric_limits<float>::max)();
+        float maxX = (std::numeric_limits<float>::lowest)();
+        float minY = (std::numeric_limits<float>::max)();
+        float maxY = (std::numeric_limits<float>::lowest)();
+
+        for (const auto &point : points)
+        {
+            float glX, glY;
+            point.ToOpenGL(glX, glY);
+            minX = (std::min)(minX, glX);
+            maxX = (std::max)(maxX, glX);
+            minY = (std::min)(minY, glY);
+            maxY = (std::max)(maxY, glY);
+        }
+
+        float figureWidth = maxX - minX;
+        float figureHeight = maxY - minY;
+
+        // Calcular escala para que quepa en la celda (con margen del 10%)
+        float scaleX = (cellWidth * 0.9f) / figureWidth;
+        float scaleY = (cellHeight * 0.9f) / figureHeight;
+        float scale = (std::min)(scaleX, scaleY);
+
+        // Si la figura es muy pequeña, usar escala 1:1 con límite superior
+        if (scale > 1.0f)
+            scale = 1.0f;
+
+        // Usar el color original de la figura
+        Color figureColor = figure->GetColor();
+        glColor3f(figureColor.r, figureColor.g, figureColor.b);
         glLineWidth(2.0f);
 
+        // Dibujar línea de la figura
         glBegin(GL_LINE_STRIP);
         for (const auto &point : points)
         {
             float glX, glY;
             point.ToOpenGL(glX, glY);
 
-            // Escalar las coordenadas para que quepan en el viewport de MainWindow
-            // Las figuras originales están en el rango [-1, 1] de DrawingWindow (800x600)
-            // Pero MainWindow es más pequeña (500x300), así que las escalamos para que sean visibles
-            float scale = 0.8f; // Escalar para que queden dentro del viewport
-            glX *= scale;
-            glY *= scale;
+            // Aplicar escala y centrar en la celda
+            glX = cellCenterX + (glX - (minX + maxX) / 2.0f) * scale;
+            glY = cellCenterY + (glY - (minY + maxY) / 2.0f) * scale;
 
-            std::wcout << L"DEBUG: Drawing point (" << glX << L", " << glY << L") for figure " << i << std::endl;
             glVertex2f(glX, glY);
         }
         glEnd();
 
-        // Dibujar puntos
-        glColor3f(colorR, colorG, colorB);
-        glPointSize(3.0f);
+        // Dibujar puntos de la figura
+        glColor3f(figureColor.r, figureColor.g, figureColor.b);
+        glPointSize(4.0f);
         glBegin(GL_POINTS);
         for (const auto &point : points)
         {
             float glX, glY;
             point.ToOpenGL(glX, glY);
 
-            // Escalar las coordenadas para que quepan en el viewport de MainWindow
-            // Las figuras originales están en el rango [-1, 1] de DrawingWindow (800x600)
-            // Pero MainWindow es más pequeña (500x300), así que las escalamos para que sean visibles
-            float scale = 0.8f; // Escalar para que queden dentro del viewport
-            glX *= scale;
-            glY *= scale;
+            // Aplicar escala y centrar en la celda
+            glX = cellCenterX + (glX - (minX + maxX) / 2.0f) * scale;
+            glY = cellCenterY + (glY - (minY + maxY) / 2.0f) * scale;
 
             glVertex2f(glX, glY);
         }

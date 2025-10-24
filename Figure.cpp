@@ -2,7 +2,7 @@
 #include "Figure.h"
 
 Figure::Figure(const std::string& figureName)
-    : name(figureName), isComplete(false)
+    : name(figureName), isComplete(false), figureColor(1.0f, 1.0f, 0.0f) // Default yellow
 {
 }
 
@@ -20,4 +20,5 @@ void Figure::Clear()
 {
     points.clear();
     isComplete = false;
+    figureColor = Color(1.0f, 1.0f, 0.0f); // Reset to default yellow
 }
