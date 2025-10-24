@@ -17,7 +17,7 @@ bool Button::Create(HWND parent)
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | WS_TABSTOP,
         x, y, width, height,
         parent,
-        reinterpret_cast<HMENU>(buttonId),
+        reinterpret_cast<HMENU>(static_cast<UINT_PTR>(buttonId)),
         GetModuleHandle(nullptr),
         nullptr
     );

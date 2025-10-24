@@ -34,10 +34,10 @@ int main()
         }
         else
         {
-            // Verificar si la ventana principal sigue activa
-            if (!mainWindow->IsActive())
+            // Verificar si alguna ventana (principal o de dibujo) sigue activa
+            if (!mainWindow->HasActiveWindows())
                 break;
-            
+
             Sleep(1);
         }
     }

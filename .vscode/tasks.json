@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "C/C++: Este",
+            "command": "cl",
+            "args": [
+                "/EHsc",
+                "/Zi",
+                "/nologo",
+                "/Fe:app.exe",
+                "*.cpp",
+                "/link",
+                "/DEBUG",
+                "user32.lib",
+                "gdi32.lib",
+                "opengl32.lib"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "detail": "Compilar todos los archivos cpp"
+        }
+    ]
+}

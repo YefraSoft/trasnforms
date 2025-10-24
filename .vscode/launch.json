@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ (Windows) - Depurar",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${fileDirname}\\app.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "externalTerminal",
+            "preLaunchTask": "C/C++: Este"
+        }
+    ]
+}

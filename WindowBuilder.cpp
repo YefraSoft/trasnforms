@@ -87,7 +87,6 @@ void WindowBuilder::MessageLoop()
         {
             // Solo invalidar ventanas que necesiten redibujado
             // Removemos la invalidación constante para evitar parpadeo
-            Sleep(16); // ~60 FPS, reduce CPU usage significativamente
         }
     }
 }
