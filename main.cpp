@@ -5,21 +5,19 @@
 
 int main()
 {
-    // Crear ventana principal
+    // Crear ventana principal sime
     WindowConfig mainConfig(L"Transformaciones Geométricas - Principal", 1000, 700, 100, 100);
     auto mainWindow = std::make_unique<MainWindow>(mainConfig);
-    
+
     if (!mainWindow->Create())
     {
         std::wcout << L"Error: No se pudo crear la ventana principal" << std::endl;
         return -1;
     }
-    
+
     mainWindow->SetRenderColor(0.1f, 0.1f, 0.2f);
     mainWindow->Show();
-    
-    std::wcout << L"Aplicación iniciada. Usa el botón para abrir la ventana de dibujo." << std::endl;
-    
+
     // Loop de mensajes simple
     MSG msg = {};
     while (true)
@@ -28,7 +26,7 @@ int main()
         {
             if (msg.message == WM_QUIT)
                 break;
-            
+
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
@@ -41,7 +39,5 @@ int main()
             Sleep(1);
         }
     }
-    
-    std::wcout << L"Aplicación finalizada." << std::endl;
     return 0;
 }

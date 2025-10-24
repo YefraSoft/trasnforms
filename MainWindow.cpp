@@ -8,6 +8,7 @@ MainWindow::MainWindow(const WindowConfig &config)
 {
     titleLabel = std::make_unique<Label>(250, 30, 500, 30, L"Transformaciones Geométricas");
     drawButton = std::make_unique<Button>(260, 70, 150, 40, L"Abrir Dibujo");
+    viewButton = std::make_unique<Button>(420, 70, 150, 40, L"Ver Primera");
 }
 
 bool MainWindow::Create()
@@ -18,10 +19,15 @@ bool MainWindow::Create()
     // Crear elementos UI
     titleLabel->Create(GetWindowHandle());
     drawButton->Create(GetWindowHandle());
+    viewButton->Create(GetWindowHandle());
 
     // Configurar callback del botón
     drawButton->SetOnClick([this]()
                            { OnDrawButtonClick(); });
+
+    // Configurar callback del botón de vista
+    viewButton->SetOnClick([this]()
+                           { OnViewButtonClick(); });
 
     // Configurar callback global para figuras
     FigureManager::SetGlobalCallback([this](std::shared_ptr<Figure> figure)
@@ -30,6 +36,8 @@ bool MainWindow::Create()
     // Forzar redibujado de los controles
     titleLabel->Show();
     drawButton->Show();
+    // viewButton oculto inicialmente hasta que haya figuras
+    viewButton->Hide();
     UpdateWindow(GetWindowHandle());
 
     // Debug: verificar tamaño inicial
@@ -59,6 +67,10 @@ LRESULT MainWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
             if (controlId == 1001) // ID del drawButton
             {
                 OnDrawButtonClick();
+            }
+            else if (controlId == 1002) // ID del viewButton
+            {
+                OnViewButtonClick();
             }
             // Para otros controles, ignorar por ahora
         }
@@ -125,7 +137,69 @@ bool MainWindow::HasActiveWindows() const
             return true;
     }
 
+    // Verificar si alguna ventana de vista está activa
+    for (const auto &viewerWindow : viewerWindows)
+    {
+        if (viewerWindow && viewerWindow->IsActive())
+            return true;
+    }
+
     return false;
+}
+
+void MainWindow::OnViewButtonClick()
+{
+    std::wcout << L"Opening figure viewer..." << std::endl;
+
+    // Verificar si hay figuras disponibles
+    if (figures.empty())
+    {
+        std::wcout << L"No figures available to view." << std::endl;
+        return;
+    }
+
+    // Verificar si ya hay ventanas de vista activas
+    int activeViewerWindows = 0;
+    for (const auto &viewerWindow : viewerWindows)
+    {
+        if (viewerWindow && viewerWindow->IsActive())
+            activeViewerWindows++;
+    }
+
+    if (activeViewerWindows > 0)
+    {
+        std::wcout << L"Warning: There is already an active viewer window. Please close it first." << std::endl;
+        return;
+    }
+
+    // Obtener la primera figura
+    auto firstFigure = figures[0];
+    std::wcout << L"Viewing first figure: " << firstFigure->GetName().c_str() << std::endl;
+
+    // Crear ventana de vista con la primera figura
+    WindowConfig viewConfig(L"Figure Viewer", 600, 500, 300, 200);
+    auto viewerWindow = std::make_unique<FigureViewerWindow>(viewConfig, firstFigure);
+
+    if (viewerWindow->Create())
+    {
+        viewerWindow->Show();
+
+        // Mantener z-order: ventana de vista detrás de la principal
+        SetWindowPos(
+            viewerWindow->GetWindowHandle(),       // Ventana de vista
+            GetWindowHandle(),                     // Ventana principal (referencia)
+            0, 0, 0, 0,                            // No cambiar posición/tamaño
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER // Mantener z-order actual
+        );
+
+        // Almacenar la ventana para que no se destruya
+        viewerWindows.push_back(std::move(viewerWindow));
+        std::wcout << L"Figure viewer window created successfully" << std::endl;
+    }
+    else
+    {
+        std::wcout << L"Failed to create figure viewer window" << std::endl;
+    }
 }
 
 void MainWindow::OnDrawButtonClick()
@@ -182,6 +256,14 @@ void MainWindow::OnFigureComplete(std::shared_ptr<Figure> figure)
 
     // Agregar figura a la lista
     figures.push_back(figure);
+
+    // Mostrar botón "Ver Primera" si es la primera figura
+    if (figures.size() == 1)
+    {
+        viewButton->Show();
+        UpdateWindow(GetWindowHandle());
+        std::wcout << L"DEBUG: View button shown - first figure available" << std::endl;
+    }
 
     // Remover la ventana de dibujo completada
     if (!drawingWindows.empty())

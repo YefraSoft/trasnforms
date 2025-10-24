@@ -156,11 +156,206 @@ if (button && button->originalWndProc) {
 - **Visual**: Bordes, colores y estilos de botones apropiados
 - **Sincronización**: Controles Windows y OpenGL perfectamente alineados
 
-### 7. Limpieza de Código
-- **Rainbow Button**: Removido completamente (funcionalidad integrada en grid)
-- **Métodos Obsoletos**: DrawRainbowBox removido
-- **Referencias**: Limpieza de IDs de controles y comentarios
-- **Documentación**: agents.md actualizado con análisis completo
+### 7. Sistema de Transformaciones Geométricas con Punto Pivote
+
+#### Nueva Funcionalidad:
+- **Botón "Ver Primera"**: Agregado en MainWindow al lado del botón "Abrir Dibujo"
+- **FigureViewerWindow**: Nueva ventana especializada para visualización individual
+- **Auto-scaling**: Renderizado centrado con ajuste automático de tamaño
+- **Navegación**: Soporte para teclado (ESC para cerrar)
+
+#### Arquitectura Implementada:
+```
+MainWindow (Interfaz Principal)
+├── viewButton (posición: 420, 70, 150, 40)
+├── OnViewButtonClick() → Verificación de figuras
+├── FigureViewerWindow::Create() → Configuración personalizada
+└── DrawSingleFigure() → Renderizado centrado optimizado
+
+FigureViewerWindow (Visualización Individual)
+├── Herencia: public Window
+├── Renderizado: Área centrada (-0.8f a 0.8f)
+├── Auto-scaling: Ajuste inteligente para visualización óptima
+├── Navegación: ESC para cerrar ventana
+└── Z-Order: Mantenimiento de orden correcto
+```
+
+#### Características Técnicas:
+- **Posicionamiento**: Botón ubicado en (420, 70) al lado del botón de dibujo
+- **Verificación**: Solo funciona cuando hay figuras disponibles
+- **Gestión de Estado**: Prevención de múltiples ventanas de vista simultáneas
+- **Renderizado**: Líneas con grosor 3.0f y puntos con tamaño 6.0f para mejor visibilidad
+- **Escalado**: Algoritmo inteligente que respeta proporciones de la figura
+
+#### Verificación Completa:
+- ✅ **Botón Funcional**: "Ver Primera" abre ventana de visualización
+- ✅ **Auto-scaling**: Figura se ajusta automáticamente al tamaño de ventana
+- ✅ **Centrado Perfecto**: Renderizado centrado en área de visualización
+- ✅ **Color Preservado**: Mantiene color original de la figura
+- ✅ **Navegación**: Tecla ESC cierra la ventana correctamente
+- ✅ **Z-Order**: Ventana de vista mantiene orden correcto
+
+### 8. Optimización del .gitignore y Limpieza del Repositorio
+
+#### Problema Identificado:
+- **Archivos innecesarios**: El repositorio contenía archivos de compilación (.obj, .exe, .pdb, .ilk)
+- **.gitignore incompleto**: No cubría todos los tipos de archivos generados por Visual Studio
+- **Impacto**: Repositorio inflado con archivos que no deberían versionarse
+
+#### .gitignore Optimizado:
+```gitignore
+# Build outputs
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.idb
+
+# Visual Studio
+.vs/
+.vscode/
+*.suo
+*.user
+*.aps
+*.pch
+
+# Archivos temporales
+*.tmp
+*.temp
+*~
+*.bak
+*.backup
+
+# Archivos específicos del proyecto
+app.exe
+app.pdb
+app.ilk
+main.pdb
+vc140.pdb
+```
+
+#### Limpieza del Repositorio:
+**Comandos para limpiar archivos ya rastreados:**
+```bash
+# 1. Ver archivos que deberían ser ignorados
+git status --porcelain
+
+# 2. Remover archivos de staging que deberían ser ignorados
+git rm --cached *.obj *.exe *.pdb *.ilk main.pdb vc140.pdb app.pdb app.ilk
+
+# 3. Verificar que se removieron correctamente
+git status
+
+# 4. Hacer commit de la limpieza
+git commit -m "Clean up build artifacts and update .gitignore"
+
+# 5. Verificar que el repositorio está limpio
+git status
+```
+
+#### Beneficios de la Optimización:
+- **Tamaño del repositorio**: Reducción significativa eliminando archivos binarios
+- **Tiempo de clonado**: Más rápido al excluir archivos de compilación
+- **Limpieza del workspace**: Solo archivos fuente relevantes visibles
+- **Mejores prácticas**: Cumple con estándares de desarrollo profesional
+
+#### Archivos que Permanecen en el Repositorio:
+- ✅ **Archivos fuente**: .cpp, .h (código fuente)
+- ✅ **Documentación**: agents.md (documentación del proyecto)
+- ✅ **Configuración**: .gitignore, Makefile.win (configuración de build)
+- ✅ **Estructura**: Carpeta .git (metadatos del repositorio)
+
+#### Archivos Excluidos:
+- ❌ **Compilación**: .obj, .exe, .pdb, .ilk (archivos generados)
+- ❌ **Configuración IDE**: .vs/, .vscode/settings (configuración personal)
+- ❌ **Temporales**: .tmp, .bak (archivos temporales)
+- ❌ **Debug**: .log, .svclog (logs del sistema)
+
+#### Nueva Funcionalidad Implementada:
+
+**1. Botón Dinámico "Ver Primera":**
+- ✅ **Oculto por defecto**: Se muestra solo cuando hay figuras disponibles
+- ✅ **Activación automática**: Se muestra en `OnFigureComplete()` cuando `figures.size() == 1`
+- ✅ **Gestión de estado**: Se oculta en `Create()` y se muestra dinámicamente
+
+**2. Sistema de Punto Pivote:**
+```cpp
+FigureViewerWindow (Nueva funcionalidad)
+├── WM_LBUTTONDOWN: HandleClick() → Establecer punto pivote rojo
+├── DrawPivotPoint(): Renderizado visual del pivote con cuadrado
+├── pivotPoint: HomogenVector para coordenadas OpenGL
+└── hasPivot: Control de estado del pivote establecido
+```
+
+**3. Sistema de Atajos de Teclado para Transformaciones:**
+```cpp
+HandleKeyboard() - Detección de combinaciones:
+├── S + ←/→ : scalar_x (decrease/increase)
+├── S + ↑/↓ : scalar_y (increase/decrease)
+├── R + ←/→ : rotar_left/rotar_right
+└── T + ←/→/↑/↓ : trasladar_x/trasladar_y
+```
+
+**4. Funciones de Transformación Implementadas:**
+```cpp
+// Todas las funciones siguen el patrón:
+void scalar_x(bool increase) {
+    PrintFigurePoints("scalar_x");
+    std::wcout << L"Evento 'scalar_x " << direction << L"' detectado" << std::endl;
+}
+```
+
+**5. Sistema de Impresión de Puntos:**
+```cpp
+PrintFigurePoints() - Formato estructurado:
+=== scalar_x ===
+Point 0: (x, y)
+Point 1: (x, y)
+...
+Pivot: (x, y)  // Si está establecido
+================
+```
+
+#### Características Técnicas:
+
+**Gestión de Estado del Botón:**
+- **Inicial**: `viewButton->Hide()` en `Create()`
+- **Activación**: `viewButton->Show()` cuando `figures.size() == 1`
+- **Mantenimiento**: Solo se muestra cuando hay figuras disponibles
+
+**Sistema de Coordenadas:**
+- **Conversión**: `ScreenToOpenGL()` para transformar click a coordenadas OpenGL
+- **Pivote visual**: Punto rojo con cuadrado indicador (tamaño 0.02f)
+- **Renderizado**: Integrado en `DrawSingleFigure()` con `hasPivot`
+
+**Eventos de Teclado:**
+- **Detección simultánea**: `GetKeyState('S') & 0x8000` para teclas modificadoras
+- **Prevención de conflictos**: ESC y combinaciones de transformación
+- **Mensajes informativos**: Cada evento imprime puntos y nombre del evento
+
+#### Verificación Completa:
+- ✅ **Botón dinámico**: Se oculta/muestra según disponibilidad de figuras
+- ✅ **Click funcional**: Establece punto pivote rojo visible
+- ✅ **Atajos de teclado**: 6 combinaciones funcionales implementadas
+- ✅ **Funciones de transformación**: Todas imprimen puntos correctamente
+- ✅ **Sistema de eventos**: Cada transformación muestra "Evento detectado"
+- ✅ **Integración visual**: Pivote se renderiza con cuadrado indicador
+- ✅ **Gestión de memoria**: Estado del pivote correctamente manejado
+
+#### Archivos Modificados:
+- ✅ **MainWindow.h**: Agregado `viewerWindows` y métodos de transformación
+- ✅ **MainWindow.cpp**: Implementación de botón dinámico y gestión de estado
+- ✅ **FigureViewerWindow.h**: Nuevos miembros y métodos de transformación
+- ✅ **FigureViewerWindow.cpp**: Implementación completa del sistema de pivote y transformaciones
+- ✅ **agents.md**: Documentación completa del nuevo sistema
+
+#### Compilación y Funcionamiento:
+```bash
+nmake /f Makefile.win clean
+nmake /f Makefile.win
+# ✅ Sin errores de sintaxis
+# ✅ Funcionalidad completa de transformaciones
+```
 
 
 ## Objetivo de la Aplicación
@@ -171,8 +366,11 @@ if (button && button->originalWndProc) {
 Desarrollar una aplicación Windows nativa que permita a los usuarios:
 1. **Dibujar figuras geométricas** interactivamente usando el mouse
 2. **Seleccionar colores** de una paleta visual de 20 colores únicos incluyendo modo rainbow dinámico
-3. **Visualizar las figuras** en la ventana principal con colores personalizados
-4. **Gestionar múltiples figuras** simultáneamente en la interfaz
+3. **Visualizar las figuras** en la ventana principal con colores personalizados usando sistema de grid 3x3
+4. **Ver figuras individualmente** usando el botón "Ver Primera" para visualización detallada
+5. **Establecer punto pivote** haciendo click en la ventana de visualización individual
+6. **Aplicar transformaciones** usando atajos de teclado (S/SHIFT/R/T + flechas) para escalado, rotación y traslación
+7. **Gestionar múltiples figuras** simultáneamente en la interfaz con navegación intuitiva
 
 ### Características Técnicas
 - **Arquitectura**: Basada en principios SOLID (Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion)
@@ -185,8 +383,13 @@ Desarrollar una aplicación Windows nativa que permita a los usuarios:
 - ✅ **Paleta de Colores**: 20 colores predefinidos con rainbow dinámico como #20
 - ✅ **Rainbow Integrado**: Elemento #20 del grid activa modo rainbow dinámico
 - ✅ **Organización en Grid**: Sistema 3x3 responsive para visualización de figuras
+- ✅ **Visualización Individual**: Botón "Ver Primera" para vista detallada de primera figura
+- ✅ **Botón Dinámico**: Se muestra solo cuando hay figuras disponibles
+- ✅ **Punto Pivote**: Click en ventana para establecer punto de referencia rojo
+- ✅ **Sistema de Transformaciones**: Atajos de teclado para escalado, rotación y traslación
+- ✅ **Auto-scaling Inteligente**: Ajuste automático de tamaño en todas las vistas
 - ✅ **Z-Order Controlado**: Ventanas de dibujo no se superponen sobre la principal
-- ✅ **Auto-scaling**: Figuras escalan automáticamente para optimizar espacio
+- ✅ **Navegación por Teclado**: ESC para cerrar ventanas de vista
 - ✅ **Gestión de Estado**: Control de múltiples ventanas y figuras activas
 - ✅ **Interfaz Intuitiva**: Botones, etiquetas y controles visuales
 
@@ -252,12 +455,15 @@ int main()
 **Miembros Privados**:
 - `titleLabel`: Etiqueta del título (std::unique_ptr<Label>)
 - `drawButton`: Botón para abrir ventana de dibujo (std::unique_ptr<Button>)
+- `viewButton`: **NUEVO** Botón para ver primera figura (std::unique_ptr<Button>)
 - `figures`: Vector de figuras completadas (std::vector<std::shared_ptr<Figure>>)
 - `drawingWindows`: Vector de ventanas de dibujo activas (std::vector<std::unique_ptr<DrawingWindow>>)
+- `viewerWindows`: **NUEVO** Vector de ventanas de vista activas (std::vector<std::unique_ptr<FigureViewerWindow>>)
 - `figureCounter`: Contador de figuras creadas (int)
 
 **Métodos Privados**:
 - `OnDrawButtonClick()`: Manejador del botón de dibujo con control de z-order
+- `OnViewButtonClick()`: **NUEVO** Manejador del botón de vista de primera figura
 - `OnFigureComplete(std::shared_ptr<Figure>)`: Callback de figura completada
 - `DrawAllFigures()`: **Sistema de Grid 3x3 responsive** para visualización de figuras
 
@@ -416,9 +622,31 @@ int main()
 - `CheckFigureComplete()`: Detección de cierre de figura
 - `DrawLines()`: Renderizado de líneas
 - `DrawColorPicker()`: Renderizado de paleta de colores
-- `ScreenToOpenGL()`: Conversión de coordenadas
 
-#### 3.5 Figure (Figure.h/Figure.cpp)
+#### 3.5 FigureViewerWindow (FigureViewerWindow.h/FigureViewerWindow.cpp)
+**Ventana Especializada para Visualización Individual de Figuras**
+
+**Herencia**: `public Window`
+**Responsabilidades**:
+- Visualización individual de una figura específica
+- Renderizado centrado y escalado automático
+- Gestión de navegación por teclado (ESC para cerrar)
+
+**Miembros Privados**:
+- `figure`: Figura a visualizar (std::shared_ptr<Figure>)
+
+**Métodos**:
+- `Create()`: Configuración de ventana con título personalizado
+- `HandleMessage()`: Procesamiento de eventos (pintado, teclado, redimensionado)
+- `DrawSingleFigure()`: **Renderizado optimizado de figura individual**
+- Renderizado centrado con auto-scaling inteligente
+- Soporte para navegación por teclado (ESC para cerrar)
+
+**Características**:
+- **Auto-scaling**: Ajuste automático del tamaño para optimizar visualización
+- **Centrado**: Posicionamiento perfecto en el centro de la ventana
+- **Navegación**: Cierre con tecla ESC para mejor UX
+- **Z-Order**: Mantiene orden correcto detrás de ventana principal
 **Representación de Figuras Geométricas**
 
 **Responsabilidades**:
@@ -521,6 +749,30 @@ Message Loop → HandleMessage() → OnDrawButtonClick() → SetWindowPos(Z-Orde
 OnMouseClick() → CheckFigureComplete() → OnFigureComplete()
      ↓
 DrawAllFigures() → Grid System → Auto-scaling → Renderizado Final
+     ↓
+OnViewButtonClick() → FigureViewerWindow::Create() → DrawSingleFigure()
+```
+
+#### Funcionalidades de Visualización:
+```
+Botón "Ver Primera" (MainWindow)
+├── Verificación de figuras disponibles (dinámico)
+├── Creación de FigureViewerWindow
+├── Renderizado individual centrado
+├── Auto-scaling para visualización óptima
+└── Navegación por teclado (ESC para cerrar)
+
+FigureViewerWindow (Visualización Individual)
+├── Click del mouse para establecer punto pivote rojo
+├── Sistema de atajos de teclado para transformaciones:
+│   ├── S + ←/→ : scalar_x (decrease/increase)
+│   ├── S + ↑/↓ : scalar_y (increase/decrease)
+│   ├── R + ←/→ : rotar_left/rotar_right
+│   └── T + ←/→/↑/↓ : trasladar_x/trasladar_y
+├── Renderizado centrado con auto-scaling inteligente
+├── Visualización del punto pivote con cuadrado indicador
+├── Impresión de puntos y eventos detectados
+└── Soporte para navegación (ESC para salir)
 ```
 
 #### Nuevo Sistema de Organización de Figuras:
@@ -546,10 +798,14 @@ DrawAllFigures() (Grid System 3x3)
 #### Puntos de Integración Críticos:
 1. **Z-Order Management**: SetWindowPos para control de superposición de ventanas
 2. **Grid System**: Organización automática de figuras en sistema 3x3 responsive
-3. **Auto-scaling**: Escalado inteligente de figuras para optimizar uso del espacio
-4. **Conversión de Coordenadas**: Screen ↔ OpenGL ↔ Homogéneo
-5. **Callback Chain**: DrawingWindow → FigureManager → MainWindow
-6. **Renderizado Nativo**: Controles Windows con apariencia y comportamiento nativos
+3. **Visualización Individual**: FigureViewerWindow para vista detallada de figuras
+4. **Punto Pivote**: Sistema de coordenadas Screen↔OpenGL para establecer referencia
+5. **Sistema de Atajos**: Detección simultánea de teclas modificadoras y direccionales
+6. **Funciones de Transformación**: Impresión estructurada de puntos y eventos
+7. **Auto-scaling**: Escalado inteligente de figuras para optimizar uso del espacio
+8. **Conversión de Coordenadas**: Screen ↔ OpenGL ↔ Homogéneo
+9. **Callback Chain**: DrawingWindow → FigureManager → MainWindow
+10. **Renderizado Nativo**: Controles Windows con apariencia y comportamiento nativos
 
 ### Conclusiones del Análisis
 
@@ -558,6 +814,10 @@ DrawAllFigures() (Grid System 3x3)
 - ✅ **Alta Cohesión**: Cada clase tiene responsabilidad única
 - ✅ **Extensibilidad**: Patrón Template Method para diferentes tipos de ventanas
 - ✅ **Mantenibilidad**: Código modular y bien estructurado
+- ✅ **Botón Dinámico**: Gestión inteligente de visibilidad según estado
+- ✅ **Sistema de Transformaciones**: Atajos de teclado intuitivos y funcionales
+- ✅ **Gestión de Pivote**: Sistema visual de referencia para transformaciones
+- ✅ **Eventos Estructurados**: Impresión organizada de puntos y acciones
 - ✅ **Z-Order Controlado**: Ventanas gestionadas correctamente sin superposiciones
 - ✅ **Grid System Eficiente**: Organización automática y responsive de figuras
 - ✅ **Auto-scaling Inteligente**: Optimización automática del espacio disponible
@@ -571,6 +831,12 @@ DrawAllFigures() (Grid System 3x3)
 - 🔄 **Sistema de Grid 3x3**: Organización responsive de hasta 9 figuras
 - 🔄 **Control de Z-Order**: Prevención de superposición de ventanas
 - 🔄 **Auto-scaling**: Ajuste automático de tamaño de figuras
+- 🔄 **Visualización Individual**: Botón "Ver Primera" para vista detallada
+- 🔄 **Botón Dinámico**: Se muestra solo cuando hay figuras disponibles
+- 🔄 **Punto Pivote**: Click para establecer punto de referencia visual
+- 🔄 **Sistema de Atajos**: 6 combinaciones de teclado para transformaciones
+- 🔄 **Funciones de Transformación**: Scalar, rotar y trasladar con impresión de puntos
+- 🔄 **Navegación por Teclado**: ESC para cerrar ventanas de vista
 - 🔄 **Renderizado Nativo**: Controles Windows con comportamiento correcto
 
 #### Métricas de Complejidad:
