@@ -8,7 +8,7 @@ MainWindow::MainWindow(const WindowConfig &config)
 {
     titleLabel = std::make_unique<Label>(250, 30, 500, 30, L"Transformaciones Geométricas");
     drawButton = std::make_unique<Button>(260, 70, 150, 40, L"Abrir Dibujo");
-    viewButton = std::make_unique<Button>(420, 70, 150, 40, L"Ver Primera");
+    viewButton = std::make_unique<Button>(420, 70, 150, 40, L"Ver Figuras");
 }
 
 bool MainWindow::Create()
@@ -172,13 +172,9 @@ void MainWindow::OnViewButtonClick()
         return;
     }
 
-    // Obtener la primera figura
-    auto firstFigure = figures[0];
-    std::wcout << L"Viewing first figure: " << firstFigure->GetName().c_str() << std::endl;
-
-    // Crear ventana de vista con la primera figura
+    // Crear ventana de vista con todas las figuras disponibles
     WindowConfig viewConfig(L"Figure Viewer", 600, 500, 300, 200);
-    auto viewerWindow = std::make_unique<FigureViewerWindow>(viewConfig, firstFigure);
+    auto viewerWindow = std::make_unique<FigureViewerWindow>(viewConfig, figures);
 
     if (viewerWindow->Create())
     {
@@ -194,7 +190,7 @@ void MainWindow::OnViewButtonClick()
 
         // Almacenar la ventana para que no se destruya
         viewerWindows.push_back(std::move(viewerWindow));
-        std::wcout << L"Figure viewer window created successfully" << std::endl;
+        std::wcout << L"Figure viewer window created successfully with " << figures.size() << L" figures" << std::endl;
     }
     else
     {
@@ -257,12 +253,12 @@ void MainWindow::OnFigureComplete(std::shared_ptr<Figure> figure)
     // Agregar figura a la lista
     figures.push_back(figure);
 
-    // Mostrar botón "Ver Primera" si es la primera figura
+    // Mostrar botón "Ver Figuras" si es la primera figura
     if (figures.size() == 1)
     {
         viewButton->Show();
         UpdateWindow(GetWindowHandle());
-        std::wcout << L"DEBUG: View button shown - first figure available" << std::endl;
+        std::wcout << L"DEBUG: View button shown - figures available" << std::endl;
     }
 
     // Remover la ventana de dibujo completada

@@ -1,10 +1,15 @@
 // FigureViewerWindow.cpp
 #include "FigureViewerWindow.h"
 #include <iostream>
+#include <algorithm> // Para std::min y std::max
+#include <limits>    // Para std::numeric_limits
 
-FigureViewerWindow::FigureViewerWindow(const WindowConfig& config, std::shared_ptr<Figure> figureToView)
-    : Window(config), figure(figureToView), hasPivot(false)
+FigureViewerWindow::FigureViewerWindow(const WindowConfig &config, const std::vector<std::shared_ptr<Figure>> &figuresToView)
+    : Window(config), figures(figuresToView), currentFigureIndex(0), hasPivot(false), sPressed(false), tPressed(false), rPressed(false), gPressed(false)
 {
+    // Configurar botones de navegación carrusel
+    leftButton = std::make_unique<Button>(10, 10, 50, 30, L"<-");
+    rightButton = std::make_unique<Button>(70, 10, 50, 30, L"->");
 }
 
 bool FigureViewerWindow::Create()
@@ -12,19 +17,50 @@ bool FigureViewerWindow::Create()
     if (!Window::Create())
         return false;
 
-    // Configurar título de la ventana con el nombre de la figura
-    if (figure)
+    // Crear botones de navegación
+    leftButton->Create(GetWindowHandle());
+    rightButton->Create(GetWindowHandle());
+
+    // Configurar callbacks de los botones
+    leftButton->SetOnClick([this]()
+                           { OnLeftButtonClick(); });
+    rightButton->SetOnClick([this]()
+                            { OnRightButtonClick(); });
+
+    // Configurar título de la ventana con información de navegación
+    UpdateButtonVisibility();
+
+    return true;
+}
+
+void FigureViewerWindow::UpdateWindowTitle()
+{
+    if (!figures.empty() && currentFigureIndex < figures.size())
     {
-        std::string title = "Figure Viewer - " + figure->GetName() + " | Click para pivote | S/SHIFT+R/T para transformaciones";
+        std::string title = "Figure Viewer - " + figures[currentFigureIndex]->GetName() +
+                            " (" + std::to_string(currentFigureIndex + 1) + "/" + std::to_string(figures.size()) + ")" +
+                            " | Click pivote | <- -> navegar | S/T/R/G + flechas | S+T/T+R combinadas | T+→ redibujar";
         std::wstring wTitle(title.begin(), title.end());
         SetTitle(wTitle.c_str());
     }
     else
     {
-        SetTitle(L"Figure Viewer - No Figure | Click para pivote");
+        SetTitle(L"Figure Viewer - No Figures | Click para pivote");
     }
+}
 
-    return true;
+void FigureViewerWindow::UpdateButtonVisibility()
+{
+    if (figures.size() <= 1)
+    {
+        leftButton->Hide();
+        rightButton->Hide();
+    }
+    else
+    {
+        leftButton->Show();
+        rightButton->Show();
+    }
 }
 
 LRESULT FigureViewerWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -44,7 +80,8 @@ LRESULT FigureViewerWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LP
 
             renderer->Render();
             DrawSingleFigure();
-            if (hasPivot) {
+            if (hasPivot)
+            {
                 DrawPivotPoint();
             }
             renderer->SwapBuffers();
@@ -84,8 +121,16 @@ LRESULT FigureViewerWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LP
 
     case WM_KEYDOWN:
     {
-        // Manejar atajos de teclado para transformaciones
+        std::wcout << L"[WM_KEYDOWN] wParam=" << wParam << L" Focus=0x" 
+               << std::hex << (intptr_t)GetFocus() << std::dec << std::endl;
+        UpdateKeyState(wParam, true);
         HandleKeyboard(wParam);
+        return 0;
+    }
+
+    case WM_KEYUP:
+    {
+        UpdateKeyState(wParam, false);
         return 0;
     }
     }
@@ -96,7 +141,11 @@ LRESULT FigureViewerWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LP
 void FigureViewerWindow::DrawSingleFigure()
 {
     auto *renderer = GetRenderer();
-    if (!renderer || !figure)
+    if (!renderer || figures.empty() || currentFigureIndex >= figures.size())
+        return;
+
+    auto figure = figures[currentFigureIndex];
+    if (!figure)
         return;
 
     // Asegurar que el contexto OpenGL esté activo
@@ -108,12 +157,13 @@ void FigureViewerWindow::DrawSingleFigure()
 
     // Obtener color de la figura
     Color figureColor = figure->GetColor();
-    std::wcout << L"FigureViewer: Rendering figure with color (" << figureColor.r << L", " << figureColor.g << L", " << figureColor.b << L")" << std::endl;
+    std::wcout << L"FigureViewer: Rendering figure " << figure->GetName().c_str()
+               << L" with color (" << figureColor.r << L", " << figureColor.g << L", " << figureColor.b << L")" << std::endl;
 
-    // Configuración del área de dibujo (usar toda la ventana)
+    // Configuración del área de dibujo (dejar espacio para botones en la parte superior)
     const float areaLeft = -0.8f;
     const float areaRight = 0.8f;
-    const float areaTop = 0.8f;
+    const float areaTop = 0.7f; // Dejar espacio para botones
     const float areaBottom = -0.8f;
 
     // Calcular el centro del área de dibujo
@@ -215,8 +265,17 @@ HomogenVector FigureViewerWindow::ScreenToOpenGL(int screenX, int screenY)
 
 void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
 {
-    bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
-    bool ctrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+    // No dependemos de sPressed/tPressed para decisiones inmediatas.
+    // Usamos GetAsyncKeyState para saber si el modificador está down justo ahora.
+    auto isDown = [](int vk) -> bool
+    {
+        return (GetAsyncKeyState(vk) & 0x8000) != 0;
+    };
+
+    bool sDown = isDown('S');
+    bool tDown = isDown('T');
+    bool rDown = isDown('R');
+    bool gDown = isDown('G');
 
     switch (wParam)
     {
@@ -224,43 +283,78 @@ void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
         PostMessage(GetWindowHandle(), WM_CLOSE, 0, 0);
         break;
 
-    // Manejar todas las combinaciones de teclas de flecha
-    case VK_LEFT:
-    case VK_RIGHT:
-    case VK_UP:
-    case VK_DOWN:
-    {
-        bool isLeft = (wParam == VK_LEFT);
-        bool isRight = (wParam == VK_RIGHT);
-        bool isUp = (wParam == VK_UP);
-        bool isDown = (wParam == VK_DOWN);
-
-        // Verificar combinaciones con teclas modificadoras
-        if (GetKeyState('S') & 0x8000) {
-            // S + Arrow (Scalar)
-            if (isLeft || isRight) {
-                scalar_x(isRight); // true para right, false para left
-            } else if (isUp || isDown) {
-                scalar_y(isUp); // true para up, false para down
-            }
-        }
-        else if (GetKeyState('R') & 0x8000) {
-            // R + Arrow (Rotate)
-            if (isLeft || isRight) {
-                if (isLeft) rotar_left();
-                else rotar_right();
-            }
-        }
-        else if (GetKeyState('T') & 0x8000) {
-            // T + Arrow (Translate)
-            if (isLeft || isRight) {
-                trasladar_x(isRight); // true para right, false para left
-            } else if (isUp || isDown) {
-                trasladar_y(isUp); // true para up, false para down
-            }
-        }
+    case 'G':
+        event_g();
         break;
-    }
+
+    case VK_RIGHT:
+        if (tDown)
+        {
+           RedrawWithNewFigure();
+            
+            break;
+        }
+
+        if (sDown && tDown)
+        {
+            PrintFigurePoints("scalar_trasladar_x");
+            std::wcout << L"S+T+→ detectado" << std::endl;
+        }
+        else if (tDown && rDown)
+        {
+            PrintFigurePoints("trasladar_rotar");
+            std::wcout << L"T+R+→ detectado" << std::endl;
+        }
+        else if (sDown)
+            scalar_x(true);
+        else if (rDown)
+            rotar_right();
+        else if (tDown)
+            trasladar_x(true);
+        else
+            NavigateToNextFigure();
+        break;
+
+    case VK_LEFT:
+        if (sDown && tDown)
+        {
+            PrintFigurePoints("scalar_trasladar_x");
+        }
+        else if (tDown && rDown)
+        {
+            PrintFigurePoints("trasladar_rotar");
+        }
+        else if (sDown)
+            scalar_x(false);
+        else if (rDown)
+            rotar_left();
+        else if (tDown)
+            trasladar_x(false);
+        else
+            NavigateToPreviousFigure();
+        break;
+
+    case VK_UP:
+        if (sDown && tDown)
+        {
+            PrintFigurePoints("scalar_trasladar_y");
+        }
+        else if (sDown)
+            scalar_y(true);
+        else if (tDown)
+            trasladar_y(true);
+        break;
+
+    case VK_DOWN:
+        if (sDown && tDown)
+        {
+            PrintFigurePoints("scalar_trasladar_y");
+        }
+        else if (sDown)
+            scalar_y(false);
+        else if (tDown)
+            trasladar_y(false);
+        break;
     }
 }
 
@@ -336,11 +430,19 @@ void FigureViewerWindow::trasladar_y(bool up)
     std::wcout << L"Evento 'trasladar_y " << direction.c_str() << L"' detectado" << std::endl;
 }
 
-void FigureViewerWindow::PrintFigurePoints(const std::string& eventName)
+void FigureViewerWindow::PrintFigurePoints(const std::string &eventName)
 {
-    if (!figure) return;
+    if (figures.empty() || currentFigureIndex >= figures.size())
+        return;
+
+    auto figure = figures[currentFigureIndex];
+    if (!figure)
+        return;
 
     std::wcout << L"=== " << eventName.c_str() << L" ===" << std::endl;
+    std::wcout << L"Current figure: " << figure->GetName().c_str()
+               << L" (" << (currentFigureIndex + 1) << L"/" << figures.size() << L")" << std::endl;
+
     const auto &points = figure->GetPoints();
 
     for (size_t i = 0; i < points.size(); ++i)
@@ -358,4 +460,206 @@ void FigureViewerWindow::PrintFigurePoints(const std::string& eventName)
     }
 
     std::wcout << L"================" << std::endl;
+}
+
+// NUEVO: Evento individual 'g'
+void FigureViewerWindow::event_g()
+{
+    PrintFigurePoints("event_g");
+    std::wcout << L"Evento 'event_g' detectado" << std::endl;
+}
+
+// NUEVAS: Funciones de navegación carrusel
+void FigureViewerWindow::NavigateToPreviousFigure()
+{
+    if (figures.size() <= 1)
+        return;
+
+    // Navegación circular: si está en la primera, ir a la última
+    if (currentFigureIndex == 0)
+        currentFigureIndex = figures.size() - 1;
+    else
+        currentFigureIndex--;
+
+    // Limpiar pivote cuando se cambia de figura
+    hasPivot = false;
+
+    // NO limpiar estado del teclado - dejar que el usuario continúe con las transformaciones
+    ClearKeyState(); // ← REMOVED: No limpiar estado para permitir eventos continuos
+
+    std::wcout << L"Navigated to previous figure: " << figures[currentFigureIndex]->GetName().c_str()
+               << L" (" << (currentFigureIndex + 1) << L"/" << figures.size() << L")" << std::endl;
+
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+}
+
+void FigureViewerWindow::NavigateToNextFigure()
+{
+    if (figures.size() <= 1)
+        return;
+
+    // Navegación circular: si está en la última, ir a la primera
+    if (currentFigureIndex >= figures.size() - 1)
+        currentFigureIndex = 0;
+    else
+        currentFigureIndex++;
+
+    // Limpiar pivote cuando se cambia de figura
+    hasPivot = false;
+
+    // NO limpiar estado del teclado - dejar que el usuario continúe con las transformaciones
+    ClearKeyState(); // ← REMOVED: No limpiar estado para permitir eventos continuos
+
+    std::wcout << L"Navigated to next figure: " << figures[currentFigureIndex]->GetName().c_str()
+               << L" (" << (currentFigureIndex + 1) << L"/" << figures.size() << L")" << std::endl;
+
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+}
+
+void FigureViewerWindow::RedrawCurrentFigure()
+{
+    if (figures.empty() || currentFigureIndex >= figures.size())
+        return;
+
+    PrintFigurePoints("redraw_current");
+    std::wcout << L"Redrawing current figure: " << figures[currentFigureIndex]->GetName().c_str() << std::endl;
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+}
+
+// FUNCIÓN PRINCIPAL: RedrawWithNewFigure() - Función detallada de ejemplo
+// Esta función demuestra cómo limpiar y redibujar una figura después de transformaciones
+void FigureViewerWindow::RedrawWithNewFigure()
+{
+    std::wcout << L"=== RedrawWithNewFigure() EJEMPLO DETALLADO ===" << std::endl;
+    std::wcout << L"Función de ejemplo para redibujar figuras después de transformaciones" << std::endl;
+
+    if (figures.empty() || currentFigureIndex >= figures.size())
+    {
+        std::wcout << L"ERROR: No hay figuras disponibles para redibujar" << std::endl;
+        return;
+    }
+
+    auto currentFigure = figures[currentFigureIndex];
+    std::wcout << L"Procesando figura actual: " << currentFigure->GetName().c_str() << std::endl;
+
+    // PASO 1: Limpiar estado actual
+    std::wcout << L"PASO 1: Limpiando estado actual..." << std::endl;
+    hasPivot = false;                          // Limpiar punto pivote
+    pivotPoint = HomogenVector(0.0f, 0.0f, 1); // Resetear punto pivote
+
+    // PASO 2: Obtener información de la figura actual
+    std::wcout << L"PASO 2: Analizando figura actual..." << std::endl;
+    const auto &points = currentFigure->GetPoints();
+    Color figureColor = currentFigure->GetColor();
+
+    std::wcout << L"  - Puntos totales: " << points.size() << std::endl;
+    std::wcout << L"  - Color actual: (" << figureColor.r << L", " << figureColor.g << L", " << figureColor.b << L")" << std::endl;
+
+    // PASO 3: Crear nueva figura basada en la actual (ejemplo inventado)
+    std::wcout << L"PASO 3: Creando nueva figura basada en la actual..." << std::endl;
+
+    // Ejemplo: Crear un cuadrado basado en los límites de la figura actual
+    if (points.size() >= 2)
+    {
+        // Calcular límites de la figura actual
+        float minX = (std::numeric_limits<float>::max)();
+        float maxX = (std::numeric_limits<float>::lowest)();
+        float minY = (std::numeric_limits<float>::max)();
+        float maxY = (std::numeric_limits<float>::lowest)();
+
+        for (const auto &point : points)
+        {
+            float glX, glY;
+            point.ToOpenGL(glX, glY);
+            minX = (std::min)(minX, glX);
+            maxX = (std::max)(maxX, glX);
+            minY = (std::min)(minY, glY);
+            maxY = (std::max)(maxY, glY);
+        }
+
+        std::wcout << L"  - Límites calculados: (" << minX << L", " << minY << L") to (" << maxX << L", " << maxY << L")" << std::endl;
+
+        // Crear un cuadrado que encierre la figura actual
+        float centerX = (minX + maxX) / 2.0f;
+        float centerY = (minY + maxY) / 2.0f;
+        float size = (std::max)(maxX - minX, maxY - minY) * 0.7f;
+
+        std::wcout << L"  - Centro calculado: (" << centerX << L", " << centerY << L")" << std::endl;
+        std::wcout << L"  - Tamaño del cuadrado: " << size << std::endl;
+    }
+
+    // PASO 4: Aplicar transformación de color a la figura (siempre)
+    std::wcout << L"PASO 4: Aplicando transformación de color a la figura..." << std::endl;
+
+    // Aplicar una transformación visible: cambiar el color a su complemento
+    Color newColor(1.0f - figureColor.r, 1.0f - figureColor.g, 1.0f - figureColor.b);
+
+    std::wcout << L"  - Color original: (" << figureColor.r << L", " << figureColor.g << L", " << figureColor.b << L")" << std::endl;
+    std::wcout << L"  - Nuevo color: (" << newColor.r << L", " << newColor.g << L", " << newColor.b << L")" << std::endl;
+
+    // APLICAR LA TRANSFORMACIÓN: Cambiar el color de la figura actual
+    currentFigure->SetColor(newColor);
+    std::wcout << L"  - Transformación de color aplicada exitosamente" << std::endl;
+
+    // PASO 5: Finalizar transformación y actualizar interfaz
+    std::wcout << L"PASO 5: Finalizando transformación..." << std::endl; // Actualizar título con nueva información                 // Forzar redibujado completo
+
+    // PASO 6: Log detallado del proceso completado
+    std::wcout << L"PASO 6: Transformación completada exitosamente" << std::endl;
+    std::wcout << L"  - Color de figura transformado" << std::endl;
+    std::wcout << L"  - Estado de pivote: " << (hasPivot ? L"activo" : L"inactivo") << std::endl;
+    std::wcout << L"  - Ventana actualizada y lista para nuevas operaciones" << std::endl;
+
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+    PrintFigurePoints("redraw_complete");
+    std::wcout << L"Evento 'RedrawWithNewFigure' completado - T+→ ejecutado exitosamente" << std::endl;
+    std::wcout << L"=====================================" << std::endl;
+    ClearKeyState();
+    SetFocus(GetWindowHandle());
+    BringWindowToTop(GetWindowHandle());
+
+    // Asegurar un repintado inmediato (opcional: solo para pruebas)
+    UpdateWindow(GetWindowHandle());
+    std::wcout << L"After Redraw: Focus=0x" << std::hex << (intptr_t)GetFocus() << std::dec << std::endl;
+}
+
+// Callbacks para botones de navegación
+void FigureViewerWindow::OnLeftButtonClick()
+{
+    std::wcout << L"Left button clicked - navigating to previous figure" << std::endl;
+    NavigateToPreviousFigure();
+}
+
+void FigureViewerWindow::OnRightButtonClick()
+{
+    std::wcout << L"Right button clicked - navigating to next figure" << std::endl;
+    NavigateToNextFigure();
+}
+
+// NUEVAS: Funciones para manejo de estado de teclado
+void FigureViewerWindow::UpdateKeyState(WPARAM wParam, bool pressed)
+{
+    switch (wParam)
+    {
+    case 'S':
+        sPressed = pressed;
+        break;
+    case 'T':
+        tPressed = pressed;
+        break;
+    case 'R':
+        rPressed = pressed;
+        break;
+    case 'G':
+        gPressed = pressed;
+        break;
+    }
+}
+
+void FigureViewerWindow::ClearKeyState()
+{
+    sPressed = false;
+    tPressed = false;
+    rPressed = false;
+    gPressed = false;
 }
