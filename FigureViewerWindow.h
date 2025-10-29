@@ -12,16 +12,12 @@ class FigureViewerWindow : public Window
 {
 private:
     const double PI = 3.14159265358979323846;
-    const float TRANSLATE_STEP = 0.05f; // Incremento por frame
-    const float SCALE_FACTOR = 1.01f;   // 1% por frame
-    float ROTATION_STEP = 0.0f;   // Grados por frame
+    const float TRANSLATE_STEP = 0.02f;
+    const float SCALE_FACTOR = 1.01f; 
+    float ROTATION_STEP = 0.0f;
     void rotate(float degree);
     void traslate(float tx, float ty);
     void scale(float sx, float sy);
-    void inv_rotate(float degree);
-    void inv_traslate(float tx, float ty);
-    void inv_scale(float sx, float sy);
-
     HomogenVector matrix_prod(float ma[3][3], HomogenVector mb);
 
     std::vector<std::shared_ptr<Figure>> figures;
@@ -44,34 +40,13 @@ private:
     void UpdateKeyState(WPARAM wParam, bool pressed);
     void ClearKeyState();
     void UpdateButtonVisibility();
-    void UpdateWindowTitle();
-
-    // Funciones de transformación
-    void scalar_x(bool increase);
-    void scalar_y(bool increase);
-    void rotar_left();
-    void rotar_right();
-    void trasladar_x(bool right);
-    void trasladar_y(bool up);
-
-    // NUEVAS: Funciones de transformación combinada
-    void scalar_trasladar_x(bool right);
-    void scalar_trasladar_y(bool up);
-    void trasladar_rotar_left();
-    void trasladar_rotar_right();
-
-    // NUEVAS: Funciones de navegación y redibujo
+ 
     void NavigateToPreviousFigure();
     void NavigateToNextFigure();
-    void RedrawCurrentFigure();
-    void RedrawWithNewFigure();
-    void event_g();
 
-    // Callbacks para botones de navegación
     void OnLeftButtonClick();
     void OnRightButtonClick();
 
-    void PrintFigurePoints(const std::string &eventName);
     HomogenVector ScreenToOpenGL(int screenX, int screenY);
 
 public:

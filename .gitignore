@@ -1,0 +1,63 @@
+# Build outputs
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.idb
+
+# Visual Studio
+.vs/
+.vscode/
+*.suo
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.tlb
+*.tlh
+*.tmp
+*.tmp_proj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.log
+*.svclog
+*.scc
+
+# Archivos temporales del sistema
+*.tmp
+*.temp
+*~
+*.bak
+*.backup
+*.old
+*.orig
+*.swp
+*.swo
+
+# Archivos específicos del proyecto
+app.exe
+app.pdb
+app.ilk
+main.pdb
+vc140.pdb
+
+# CMake (por si se usa en el futuro)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Otros archivos comunes
+.DS_Store
+Thumbs.db
+desktop.ini
+agents.md
