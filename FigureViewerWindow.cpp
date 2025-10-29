@@ -1,6 +1,7 @@
 // FigureViewerWindow.cpp
 #include "FigureViewerWindow.h"
 #include <iostream>
+#include <cmath>
 #include <algorithm> // Para std::min y std::max
 #include <limits>    // Para std::numeric_limits
 
@@ -121,8 +122,8 @@ LRESULT FigureViewerWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LP
 
     case WM_KEYDOWN:
     {
-        std::wcout << L"[WM_KEYDOWN] wParam=" << wParam << L" Focus=0x" 
-               << std::hex << (intptr_t)GetFocus() << std::dec << std::endl;
+        std::wcout << L"[WM_KEYDOWN] wParam=" << wParam << L" Focus=0x"
+                   << std::hex << (intptr_t)GetFocus() << std::dec << std::endl;
         UpdateKeyState(wParam, true);
         HandleKeyboard(wParam);
         return 0;
@@ -148,91 +149,33 @@ void FigureViewerWindow::DrawSingleFigure()
     if (!figure)
         return;
 
-    // Asegurar que el contexto OpenGL esté activo
     wglMakeCurrent(GetDC(GetWindowHandle()), renderer->GetGLRC());
 
     const auto &points = figure->GetPoints();
     if (points.size() < 2)
         return;
 
-    // Obtener color de la figura
     Color figureColor = figure->GetColor();
-    std::wcout << L"FigureViewer: Rendering figure " << figure->GetName().c_str()
-               << L" with color (" << figureColor.r << L", " << figureColor.g << L", " << figureColor.b << L")" << std::endl;
 
-    // Configuración del área de dibujo (dejar espacio para botones en la parte superior)
-    const float areaLeft = -0.8f;
-    const float areaRight = 0.8f;
-    const float areaTop = 0.7f; // Dejar espacio para botones
-    const float areaBottom = -0.8f;
-
-    // Calcular el centro del área de dibujo
-    float centerX = (areaLeft + areaRight) / 2.0f;
-    float centerY = (areaTop + areaBottom) / 2.0f;
-
-    // Calcular límites de la figura
-    float minX = (std::numeric_limits<float>::max)();
-    float maxX = (std::numeric_limits<float>::lowest)();
-    float minY = (std::numeric_limits<float>::max)();
-    float maxY = (std::numeric_limits<float>::lowest)();
-
-    for (const auto &point : points)
-    {
-        float glX, glY;
-        point.ToOpenGL(glX, glY);
-        minX = (std::min)(minX, glX);
-        maxX = (std::max)(maxX, glX);
-        minY = (std::min)(minY, glY);
-        maxY = (std::max)(maxY, glY);
-    }
-
-    float figureWidth = maxX - minX;
-    float figureHeight = maxY - minY;
-
-    // Calcular escala para que quepa en el área (con margen del 10%)
-    float availableWidth = areaRight - areaLeft;
-    float availableHeight = areaTop - areaBottom;
-
-    float scaleX = (availableWidth * 0.9f) / figureWidth;
-    float scaleY = (availableHeight * 0.9f) / figureHeight;
-    float scale = (std::min)(scaleX, scaleY);
-
-    // Si la figura es muy pequeña, usar escala 1:1 con límite superior
-    if (scale > 1.0f)
-        scale = 1.0f;
-
-    // Establecer color de la figura
+    // Dibujar SIN recentrar
     glColor3f(figureColor.r, figureColor.g, figureColor.b);
     glLineWidth(3.0f);
 
-    // Dibujar línea de la figura
     glBegin(GL_LINE_STRIP);
     for (const auto &point : points)
     {
         float glX, glY;
         point.ToOpenGL(glX, glY);
-
-        // Aplicar escala y centrar en el área
-        glX = centerX + (glX - (minX + maxX) / 2.0f) * scale;
-        glY = centerY + (glY - (minY + maxY) / 2.0f) * scale;
-
-        glVertex2f(glX, glY);
+        glVertex2f(glX, glY); // Coordenadas directas
     }
     glEnd();
 
-    // Dibujar puntos de la figura
-    glColor3f(figureColor.r, figureColor.g, figureColor.b);
     glPointSize(6.0f);
     glBegin(GL_POINTS);
     for (const auto &point : points)
     {
         float glX, glY;
         point.ToOpenGL(glX, glY);
-
-        // Aplicar escala y centrar en el área
-        glX = centerX + (glX - (minX + maxX) / 2.0f) * scale;
-        glY = centerY + (glY - (minY + maxY) / 2.0f) * scale;
-
         glVertex2f(glX, glY);
     }
     glEnd();
@@ -265,8 +208,6 @@ HomogenVector FigureViewerWindow::ScreenToOpenGL(int screenX, int screenY)
 
 void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
 {
-    // No dependemos de sPressed/tPressed para decisiones inmediatas.
-    // Usamos GetAsyncKeyState para saber si el modificador está down justo ahora.
     auto isDown = [](int vk) -> bool
     {
         return (GetAsyncKeyState(vk) & 0x8000) != 0;
@@ -290,8 +231,7 @@ void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
     case VK_RIGHT:
         if (tDown)
         {
-           RedrawWithNewFigure();
-            
+            traslate(TRANSLATE_STEP, 0); // CORREGIDO: quitar el + 0.1f
             break;
         }
 
@@ -306,11 +246,18 @@ void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
             std::wcout << L"T+R+→ detectado" << std::endl;
         }
         else if (sDown)
-            scalar_x(true);
+        {
+            scale(SCALE_FACTOR, 1); // CORREGIDO: quitar el + 0.1f
+        }
         else if (rDown)
-            rotar_right();
-        else if (tDown)
-            trasladar_x(true);
+        {
+            ROTATION_STEP += 0.2;
+            if (ROTATION_STEP >= 360)
+            {
+                ROTATION_STEP -= 360;
+            }
+            rotate(ROTATION_STEP);
+        }
         else
             NavigateToNextFigure();
         break;
@@ -325,11 +272,22 @@ void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
             PrintFigurePoints("trasladar_rotar");
         }
         else if (sDown)
-            scalar_x(false);
+        {
+            scale(1.0f / SCALE_FACTOR, 1); // CORREGIDO: quitar referencias extras
+        }
         else if (rDown)
-            rotar_left();
+        {
+            ROTATION_STEP += 0.2f;
+            if (ROTATION_STEP >= 360)
+            {
+                ROTATION_STEP -= 360;
+            }
+            inv_rotate(ROTATION_STEP);
+        }
         else if (tDown)
-            trasladar_x(false);
+        {
+            traslate(-TRANSLATE_STEP, 0); // CORREGIDO: quitar el + 0.1f
+        }
         else
             NavigateToPreviousFigure();
         break;
@@ -340,9 +298,13 @@ void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
             PrintFigurePoints("scalar_trasladar_y");
         }
         else if (sDown)
-            scalar_y(true);
+        {
+            scale(1, SCALE_FACTOR); // CORREGIDO: quitar el + 0.1f
+        }
         else if (tDown)
-            trasladar_y(true);
+        {
+            traslate(0, TRANSLATE_STEP); // CORREGIDO: quitar el + 0.1f
+        }
         break;
 
     case VK_DOWN:
@@ -351,9 +313,13 @@ void FigureViewerWindow::HandleKeyboard(WPARAM wParam)
             PrintFigurePoints("scalar_trasladar_y");
         }
         else if (sDown)
-            scalar_y(false);
+        {
+            scale(1, 1.0f / SCALE_FACTOR); // CORREGIDO
+        }
         else if (tDown)
-            trasladar_y(false);
+        {
+            traslate(0, -TRANSLATE_STEP); // CORREGIDO: quitar el + 0.1f
+        }
         break;
     }
 }
@@ -662,4 +628,144 @@ void FigureViewerWindow::ClearKeyState()
     tPressed = false;
     rPressed = false;
     gPressed = false;
+}
+
+void FigureViewerWindow::rotate(float degree)
+{
+    float angle = degree * PI / 180.0;
+    float rotateMatrix[3][3] = {
+        {std::cos(angle), -std::sin(angle), 0},
+        {std::sin(angle), std::cos(angle), 0},
+        {0, 0, 1}};
+    if (figures.empty() || currentFigureIndex >= figures.size())
+        return;
+
+    auto figure = figures[currentFigureIndex];
+    if (!figure)
+        return;
+    auto &points = figure->GetPoints();
+
+    if (hasPivot)
+    {
+        float pivotX, pivotY;
+        pivotPoint.ToOpenGL(pivotX, pivotY);
+
+        for (auto &p : points)
+        {
+            p.x -= pivotX;
+            p.y -= pivotY;
+            p = matrix_prod(rotateMatrix, p);
+            p.x += pivotX;
+            p.y += pivotY;
+        }
+    }
+    else
+    {
+        for (auto &p : points)
+        {
+            p = matrix_prod(rotateMatrix, p);
+        }
+    }
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+    UpdateWindow(GetWindowHandle());
+}
+void FigureViewerWindow::inv_rotate(float degree)
+{
+    float angle = degree * PI / 180.0;
+    float rotateMatrix[3][3] = {
+        {std::cos(angle), std::sin(angle), 0},
+        {-std::sin(angle), std::cos(angle), 0},
+        {0, 0, 1}};
+    if (figures.empty() || currentFigureIndex >= figures.size())
+        return;
+
+    auto figure = figures[currentFigureIndex];
+    if (!figure)
+        return;
+    auto &points = figure->GetPoints();
+
+    for (auto &p : points)
+    {
+        p = matrix_prod(rotateMatrix, p);
+    }
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+    UpdateWindow(GetWindowHandle());
+}
+
+void FigureViewerWindow::traslate(float tx, float ty)
+{
+    float traslateMatrix[3][3] = {
+        {1, 0, tx},
+        {0, 1, ty},
+        {0, 0, 1}};
+
+    if (figures.empty() || currentFigureIndex >= figures.size())
+        return;
+
+    auto figure = figures[currentFigureIndex];
+    if (!figure)
+        return;
+    auto &points = figure->GetPoints();
+
+    for (auto &p : points)
+    {
+        p.x += tx;
+        p.y += ty;
+        // p = matrix_prod(traslateMatrix, p);
+    }
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+    UpdateWindow(GetWindowHandle());
+}
+
+HomogenVector FigureViewerWindow::matrix_prod(float ma[3][3], HomogenVector mb)
+{
+    float x = mb.x;
+    float y = mb.y;
+
+    float nx = ma[0][0] * x + ma[0][1] * y + ma[0][2] * 1;
+    float ny = ma[1][0] * x + ma[1][1] * y + ma[1][2] * 1;
+
+    return HomogenVector(nx, ny, 1.0f);
+    ;
+}
+
+void FigureViewerWindow::scale(float sx, float sy)
+{
+    float scale_matrix[3][3] = {
+        {sx, 0, 0},
+        {0, sy, 0},
+        {0, 0, 1}};
+
+    if (figures.empty() || currentFigureIndex >= figures.size())
+        return;
+
+    auto figure = figures[currentFigureIndex];
+    if (!figure)
+        return;
+    auto &points = figure->GetPoints();
+
+    if (hasPivot)
+    {
+        float pivotX, pivotY;
+        pivotPoint.ToOpenGL(pivotX, pivotY);
+
+        for (auto &p : points)
+        {
+            p.x -= pivotX;
+            p.y -= pivotY;
+            p = matrix_prod(scale_matrix, p);
+            p.x += pivotX;
+            p.y += pivotY;
+        }
+    }
+    else
+    {
+        // Escalar desde el origen si no hay pivote
+        for (auto &p : points)
+        {
+            p = matrix_prod(scale_matrix, p);
+        }
+    }
+    InvalidateRect(GetWindowHandle(), nullptr, FALSE);
+    UpdateWindow(GetWindowHandle());
 }

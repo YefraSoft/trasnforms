@@ -11,10 +11,23 @@
 class FigureViewerWindow : public Window
 {
 private:
-    std::vector<std::shared_ptr<Figure>> figures; // Múltiples figuras para navegación
-    size_t currentFigureIndex;                    // Índice de la figura actual
-    HomogenVector pivotPoint;                     // Punto pivote para transformaciones
-    bool hasPivot;                                // Indica si se ha establecido el pivote
+    const double PI = 3.14159265358979323846;
+    const float TRANSLATE_STEP = 0.05f; // Incremento por frame
+    const float SCALE_FACTOR = 1.01f;   // 1% por frame
+    float ROTATION_STEP = 0.0f;   // Grados por frame
+    void rotate(float degree);
+    void traslate(float tx, float ty);
+    void scale(float sx, float sy);
+    void inv_rotate(float degree);
+    void inv_traslate(float tx, float ty);
+    void inv_scale(float sx, float sy);
+
+    HomogenVector matrix_prod(float ma[3][3], HomogenVector mb);
+
+    std::vector<std::shared_ptr<Figure>> figures;
+    size_t currentFigureIndex;
+    HomogenVector pivotPoint;
+    bool hasPivot;
     bool sPressed;
     bool tPressed;
     bool rPressed;

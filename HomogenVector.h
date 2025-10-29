@@ -5,7 +5,7 @@ struct HomogenVector
 {
     float x = 0.f; /**< x coordinate */
     float y = 0.f; /**< y coordinate */
-    int w = 1;     /**< homogeneous component (formerly 'o') */
+    float w = 1.0f;     /**< homogeneous component (formerly 'o') */
     
     HomogenVector() = default;
     HomogenVector(float x, float y, int w = 1) : x(x), y(y), w(w) {}
@@ -31,3 +31,4 @@ struct HomogenVector
         }
     }
 };
+

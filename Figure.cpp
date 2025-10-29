@@ -22,3 +22,4 @@ void Figure::Clear()
     isComplete = false;
     figureColor = Color(1.0f, 1.0f, 0.0f); // Reset to default yellow
 }
+

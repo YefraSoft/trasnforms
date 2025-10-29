@@ -15,3 +15,4 @@ void FigureManager::NotifyFigureComplete(std::shared_ptr<Figure> figure)
         globalCallback(figure);
     }
 }
+

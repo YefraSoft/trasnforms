@@ -15,3 +15,4 @@ public:
     static void SetGlobalCallback(FigureCallback callback);
     static void NotifyFigureComplete(std::shared_ptr<Figure> figure);
 };
+
